@@ -1,396 +1,225 @@
-// --- THE JOURNAL FRONTEND APPLICATION LOGIC ---
-
-// Configuration
 const API_URL = '/api';
+let state = { posts: [], filterTag: null };
 
-// State Management
-let state = {
-  posts: [],
-  currentFilterTag: null,
-  activeTab: 'write' // 'write' or 'preview'
-};
-
-// DOM Elements Cache
-const el = {
-  viewHome: document.getElementById('view-home'),
-  viewRead: document.getElementById('view-read'),
-  viewEditor: document.getElementById('view-editor'),
-  postsContainer: document.getElementById('posts-list-container'),
-  tagsFilterContainer: document.getElementById('home-tags-filter'),
-  themeToggleBtn: document.getElementById('theme-toggle'),
-  toast: document.getElementById('toast'),
-  
-  // Read View Elements
-  readDate: document.getElementById('read-post-date'),
-  readTime: document.getElementById('read-post-time'),
-  readTitle: document.getElementById('read-post-title'),
-  readTags: document.getElementById('read-post-tags'),
-  readBody: document.getElementById('read-post-body'),
-  btnEdit: document.getElementById('btn-edit-post'),
-  btnDelete: document.getElementById('btn-delete-post'),
-  
-  // Editor View Elements
-  editorTitle: document.getElementById('editor-view-title'),
-  editorForm: document.getElementById('editor-form'),
-  postIdInput: document.getElementById('edit-post-id'),
-  postTitleInput: document.getElementById('post-title'),
-  postExcerptInput: document.getElementById('post-excerpt'),
-  postTagsInput: document.getElementById('post-tags-input'),
-  postContentInput: document.getElementById('post-content'),
-  editorPreview: document.getElementById('editor-preview'),
-  btnTabWrite: document.getElementById('btn-tab-write'),
-  btnTabPreview: document.getElementById('btn-tab-preview'),
-  btnSavePost: document.getElementById('btn-save-post')
-};
-
-// --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
   initTheme();
   initRouter();
-  initFormListeners();
-  initEditorTabs();
+  initForm();
   
-  // Initialize Feather Icons for static templates
-  if (typeof feather !== 'undefined') {
-    feather.replace();
-  }
+  if (typeof feather !== 'undefined') feather.replace();
 });
 
-// --- CLIENT-SIDE ROUTER ---
+// Router
 function initRouter() {
   window.addEventListener('hashchange', handleRoute);
-  // Run router on first load
   handleRoute();
 }
 
 function handleRoute() {
   const hash = window.location.hash || '#home';
-  
-  // Reset tabs when changing routes
-  switchEditorTab('write');
+  switchTab('write');
 
   if (hash === '#home' || hash === '') {
-    navigateToView('home');
-    loadAndRenderHome();
+    showView('view-home');
+    loadHome();
   } else if (hash === '#new') {
-    navigateToView('editor');
-    setupNewPostForm();
+    showView('view-editor');
+    setupEditor();
   } else if (hash.startsWith('#post/')) {
-    const id = hash.split('/')[1];
-    navigateToView('read');
-    loadAndRenderPost(id);
+    showView('view-read');
+    loadPost(hash.split('/')[1]);
   } else if (hash.startsWith('#edit/')) {
-    const id = hash.split('/')[1];
-    navigateToView('editor');
-    setupEditPostForm(id);
+    showView('view-editor');
+    setupEditor(hash.split('/')[1]);
   }
 }
 
-function navigateToView(viewName) {
-  // Hide all views
-  el.viewHome.classList.add('hidden');
-  el.viewRead.classList.add('hidden');
-  el.viewEditor.classList.add('hidden');
-  
-  // Show target view
-  if (viewName === 'home') el.viewHome.classList.remove('hidden');
-  if (viewName === 'read') el.viewRead.classList.remove('hidden');
-  if (viewName === 'editor') el.viewEditor.classList.remove('hidden');
-  
-  // Scroll to top
-  window.scrollTo({ top: 0, behavior: 'instant' });
+function showView(id) {
+  document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+  window.scrollTo(0, 0);
 }
 
-// --- API ACTIONS ---
-
-async function apiRequest(endpoint, options = {}) {
+// APIs & Loaders
+async function api(path, options = {}) {
   try {
-    const response = await fetch(`${API_URL}${endpoint}`, {
-      headers: {
-        'Content-Type': 'application/json',
-      },
+    const res = await fetch(`${API_URL}${path}`, {
+      headers: { 'Content-Type': 'application/json' },
       ...options
     });
-    
-    if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.error || 'Something went wrong');
-    }
-    
-    return await response.json();
-  } catch (error) {
-    showToast(error.message, 'danger');
-    throw error;
+    if (!res.ok) throw new Error((await res.json()).error || 'API Error');
+    return await res.json();
+  } catch (err) {
+    showToast(err.message);
+    throw err;
   }
 }
 
-// --- VIEW CONTROLLERS ---
-
-// Home View
-async function loadAndRenderHome() {
-  el.postsContainer.innerHTML = `
-    <div class="loading-state">
-      <div class="spinner"></div>
-      <p>Gathering notes...</p>
-    </div>
-  `;
+async function loadHome() {
+  const container = document.getElementById('posts-list');
+  container.innerHTML = '<div class="loading">Loading notes...</div>';
   
   try {
-    const posts = await apiRequest('/posts');
-    state.posts = posts;
-    renderTagsFilter();
-    renderPostsList();
-  } catch (error) {
-    el.postsContainer.innerHTML = `
-      <div class="loading-state">
-        <p class="error-message">Could not load notes. Please try again later.</p>
-      </div>
-    `;
+    state.posts = await api('/posts');
+    renderTags();
+    renderFeed();
+  } catch (err) {
+    container.innerHTML = '<div class="loading">Failed to load notes.</div>';
   }
 }
 
-function renderTagsFilter() {
-  // Extract all unique tags
-  const tagsSet = new Set();
-  state.posts.forEach(post => {
-    if (post.tags && Array.isArray(post.tags)) {
-      post.tags.forEach(tag => tagsSet.add(tag.trim()));
-    }
-  });
+function renderTags() {
+  const tagsContainer = document.getElementById('tags-filter');
+  const tags = new Set();
+  state.posts.forEach(p => p.tags?.forEach(t => tags.add(t.trim())));
   
-  const tags = Array.from(tagsSet);
-  
-  if (tags.length === 0) {
-    el.tagsFilterContainer.innerHTML = `<span class="text-muted">No tags found.</span>`;
+  if (tags.size === 0) {
+    tagsContainer.innerHTML = '';
     return;
   }
-  
-  let html = `<button class="tag-badge ${!state.currentFilterTag ? 'active' : ''}" onclick="filterByTag(null)">All</button>`;
-  
-  tags.forEach(tag => {
-    const activeClass = state.currentFilterTag === tag ? 'active' : '';
-    html += `<button class="tag-badge ${activeClass}" onclick="filterByTag('${tag}')">${tag}</button>`;
+
+  let html = `<button class="tag ${!state.filterTag ? 'active' : ''}" onclick="filterTag(null)">All</button>`;
+  tags.forEach(t => {
+    html += `<button class="tag ${state.filterTag === t ? 'active' : ''}" onclick="filterTag('${t}')">${t}</button>`;
   });
-  
-  el.tagsFilterContainer.innerHTML = html;
+  tagsContainer.innerHTML = html;
 }
 
-window.filterByTag = function(tag) {
-  state.currentFilterTag = tag;
-  
-  // Re-render tags selection and lists
-  renderTagsFilter();
-  renderPostsList();
+window.filterTag = function(t) {
+  state.filterTag = t;
+  renderTags();
+  renderFeed();
 };
 
-function renderPostsList() {
-  const filteredPosts = state.currentFilterTag 
-    ? state.posts.filter(p => p.tags && p.tags.includes(state.currentFilterTag))
-    : state.posts;
-    
-  if (filteredPosts.length === 0) {
-    el.postsContainer.innerHTML = `
-      <div class="loading-state">
-        <p>No notes found here yet.</p>
-      </div>
-    `;
+function renderFeed() {
+  const container = document.getElementById('posts-list');
+  const list = state.filterTag ? state.posts.filter(p => p.tags?.includes(state.filterTag)) : state.posts;
+
+  if (list.length === 0) {
+    container.innerHTML = '<div class="loading">No notes yet.</div>';
     return;
   }
-  
-  let html = '';
-  filteredPosts.forEach(post => {
-    const formattedDate = new Date(post.date).toLocaleDateString('en-US', {
-      year: 'numeric', month: 'long', day: 'numeric'
-    });
-    
-    const tagsHtml = post.tags && post.tags.length > 0
-      ? `<div class="post-card-tags">` + post.tags.map(t => `<span class="post-card-tag">${t}</span>`).join('') + `</div>`
-      : '';
 
-    html += `
-      <article class="post-card" onclick="window.location.hash = '#post/${post.id}'">
-        <div class="post-card-meta">
-          <span>${formattedDate}</span>
-          <span class="meta-dot">•</span>
-          <span>${post.readingTime}</span>
-        </div>
-        <h3>${escapeHtml(post.title)}</h3>
-        <p>${escapeHtml(post.excerpt)}</p>
-        ${tagsHtml}
+  container.innerHTML = list.map(p => {
+    const date = new Date(p.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const tags = p.tags?.map(t => `<span class="post-card-tag">${t}</span>`).join('') || '';
+    
+    // Auto teaser from content
+    const teaser = p.content.replace(/[#*`]/g, '').substring(0, 120) + '...';
+    
+    return `
+      <article class="post-card" onclick="window.location.hash = '#post/${p.id}'">
+        <div class="post-card-meta">${date}<span class="dot">•</span>${p.readingTime}</div>
+        <h3>${escapeHtml(p.title)}</h3>
+        <p>${escapeHtml(teaser)}</p>
+        <div class="post-card-tags">${tags}</div>
       </article>
     `;
-  });
-  
-  el.postsContainer.innerHTML = html;
+  }).join('');
 }
 
-// Read View
-async function loadAndRenderPost(id) {
+async function loadPost(id) {
+  const body = document.getElementById('read-body');
+  body.innerHTML = 'Loading...';
+  
   try {
-    const post = await apiRequest(`/posts/${id}`);
+    const post = await api(`/posts/${id}`);
+    document.getElementById('read-title').textContent = post.title;
+    document.getElementById('read-date').textContent = new Date(post.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    document.getElementById('read-time').textContent = post.readingTime;
+    document.getElementById('read-tags').innerHTML = post.tags?.map(t => `<span class="post-tag">${escapeHtml(t)}</span>`).join('') || '';
     
-    // Set text contents
-    const formattedDate = new Date(post.date).toLocaleDateString('en-US', {
-      year: 'numeric', month: 'long', day: 'numeric'
-    });
-    el.readDate.textContent = formattedDate;
-    el.readTime.textContent = post.readingTime;
-    el.readTitle.textContent = post.title;
+    body.innerHTML = typeof marked !== 'undefined' ? marked.parse(post.content) : escapeHtml(post.content);
     
-    // Set tags
-    el.readTags.innerHTML = post.tags && post.tags.length > 0
-      ? post.tags.map(t => `<span class="post-tag">${escapeHtml(t)}</span>`).join('')
-      : '';
-      
-    // Parse Markdown safely
-    if (typeof marked !== 'undefined') {
-      el.readBody.innerHTML = marked.parse(post.content);
-    } else {
-      el.readBody.innerHTML = `<p>${escapeHtml(post.content).replace(/\n/g, '<br>')}</p>`;
-    }
+    document.getElementById('btn-edit').onclick = () => window.location.hash = `#edit/${post.id}`;
+    document.getElementById('btn-delete').onclick = () => deletePost(post.id);
     
-    // Setup Action Buttons
-    el.btnEdit.onclick = () => window.location.hash = `#edit/${post.id}`;
-    el.btnDelete.onclick = () => confirmDeletePost(post.id);
-    
-    if (typeof feather !== 'undefined') {
-      feather.replace();
-    }
-  } catch (error) {
-    el.readBody.innerHTML = `<p class="error-message">Could not load post content.</p>`;
+    if (typeof feather !== 'undefined') feather.replace();
+  } catch (err) {
+    body.innerHTML = 'Error loading post.';
   }
 }
 
-async function confirmDeletePost(id) {
-  if (confirm("Are you sure you want to delete this note forever?")) {
-    try {
-      await apiRequest(`/posts/${id}`, { method: 'DELETE' });
-      showToast("Note deleted successfully.");
-      window.location.hash = '#home';
-    } catch (error) {
-      // API error handler toasts automatically
-    }
-  }
-}
-
-// Editor View
-function setupNewPostForm() {
-  el.editorTitle.textContent = "New Note";
-  el.btnSavePost.textContent = "Save Note";
-  el.postIdInput.value = "";
-  el.editorForm.reset();
-  el.editorPreview.innerHTML = `<p class="preview-placeholder">Nothing to preview yet.</p>`;
-}
-
-async function setupEditPostForm(id) {
-  el.editorTitle.textContent = "Edit Note";
-  el.btnSavePost.textContent = "Save Note";
-  
-  try {
-    const post = await apiRequest(`/posts/${id}`);
-    el.postIdInput.value = post.id;
-    el.postTitleInput.value = post.title;
-    el.postExcerptInput.value = post.excerpt || '';
-    el.postTagsInput.value = post.tags ? post.tags.join(', ') : '';
-    el.postContentInput.value = post.content;
-    
-    // Update preview if switching to preview tab
-    if (typeof marked !== 'undefined') {
-      el.editorPreview.innerHTML = marked.parse(post.content || '');
-    }
-  } catch (error) {
+async function deletePost(id) {
+  if (confirm('Delete this note?')) {
+    await api(`/posts/${id}`, { method: 'DELETE' });
+    showToast('Note deleted');
     window.location.hash = '#home';
   }
 }
 
-function initFormListeners() {
-  el.editorForm.addEventListener('submit', async (e) => {
+// Editor Form
+function initForm() {
+  document.getElementById('editor-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    
-    const id = el.postIdInput.value;
-    const title = el.postTitleInput.value.trim();
-    const excerpt = el.postExcerptInput.value.trim();
-    const content = el.postContentInput.value;
-    
-    // Parse tags: split by comma, trim whitespace, filter empty tags
-    const tags = el.postTagsInput.value
-      .split(',')
-      .map(t => t.trim())
-      .filter(t => t.length > 0);
-      
-    const payload = { title, excerpt, content, tags };
-    
-    try {
-      if (id) {
-        // Edit Mode
-        const updated = await apiRequest(`/posts/${id}`, {
-          method: 'PUT',
-          body: JSON.stringify(payload)
-        });
-        showToast("Note saved successfully.");
-        window.location.hash = `#post/${updated.id}`;
-      } else {
-        // Create Mode
-        const created = await apiRequest('/posts', {
-          method: 'POST',
-          body: JSON.stringify(payload)
-        });
-        showToast("Note saved successfully!");
-        window.location.hash = `#post/${created.id}`;
-      }
-    } catch (error) {
-      // Handled in apiRequest
-    }
-  });
-}
+    const id = document.getElementById('edit-id').value;
+    const title = document.getElementById('post-title').value.trim();
+    const content = document.getElementById('post-content').value;
+    const tags = document.getElementById('post-tags').value.split(',').map(t => t.trim()).filter(Boolean);
 
-// Write/Preview Tabs
-function initEditorTabs() {
-  el.btnTabWrite.addEventListener('click', () => switchEditorTab('write'));
-  el.btnTabPreview.addEventListener('click', () => switchEditorTab('preview'));
-}
-
-function switchEditorTab(tab) {
-  state.activeTab = tab;
-  
-  if (tab === 'write') {
-    el.btnTabWrite.classList.add('active');
-    el.btnTabPreview.classList.remove('active');
-    el.postContentInput.classList.remove('hidden');
-    el.editorPreview.classList.add('hidden');
-  } else {
-    el.btnTabWrite.classList.remove('active');
-    el.btnTabPreview.classList.add('active');
-    el.postContentInput.classList.add('hidden');
-    el.editorPreview.classList.remove('hidden');
+    const payload = { title, content, tags };
     
-    // Parse content
-    const content = el.postContentInput.value.trim();
-    if (content) {
-      if (typeof marked !== 'undefined') {
-        el.editorPreview.innerHTML = marked.parse(content);
-      } else {
-        el.editorPreview.innerHTML = `<p>${escapeHtml(content).replace(/\n/g, '<br>')}</p>`;
-      }
+    if (id) {
+      await api(`/posts/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+      showToast('Note updated');
     } else {
-      el.editorPreview.innerHTML = `<p class="preview-placeholder">Nothing to preview yet.</p>`;
+      const created = await api('/posts', { method: 'POST', body: JSON.stringify(payload) });
+      showToast('Note saved');
+      window.location.hash = `#post/${created.id}`;
+      return;
     }
+    window.location.hash = `#post/${id}`;
+  });
+
+  document.getElementById('tab-write').onclick = () => switchTab('write');
+  document.getElementById('tab-preview').onclick = () => switchTab('preview');
+}
+
+function switchTab(tab) {
+  const writeBtn = document.getElementById('tab-write');
+  const prevBtn = document.getElementById('tab-preview');
+  const txt = document.getElementById('post-content');
+  const prev = document.getElementById('editor-preview');
+
+  if (tab === 'write') {
+    writeBtn.classList.add('active');
+    prevBtn.classList.remove('active');
+    txt.classList.remove('hidden');
+    prev.classList.add('hidden');
+  } else {
+    writeBtn.classList.remove('active');
+    prevBtn.classList.add('active');
+    txt.classList.add('hidden');
+    prev.classList.remove('hidden');
+    
+    const content = txt.value.trim();
+    prev.innerHTML = content ? (typeof marked !== 'undefined' ? marked.parse(content) : escapeHtml(content)) : 'Nothing to preview.';
   }
 }
 
-// --- THEME MANAGEMENT (LIGHT/DARK) ---
-function initTheme() {
-  const savedTheme = localStorage.getItem('theme');
-  
-  if (savedTheme === 'dark') {
-    document.documentElement.setAttribute('data-theme', 'dark');
-  } else {
-    document.documentElement.removeAttribute('data-theme');
+async function setupEditor(id = '') {
+  document.getElementById('editor-title').textContent = id ? 'Edit Note' : 'New Note';
+  document.getElementById('btn-save').textContent = id ? 'Save Changes' : 'Save Note';
+  document.getElementById('edit-id').value = id;
+  document.getElementById('editor-form').reset();
+  document.getElementById('editor-preview').innerHTML = '';
+
+  if (id) {
+    const post = await api(`/posts/${id}`);
+    document.getElementById('post-title').value = post.title;
+    document.getElementById('post-tags').value = post.tags ? post.tags.join(', ') : '';
+    document.getElementById('post-content').value = post.content;
   }
+}
+
+// Utilities
+function initTheme() {
+  const toggle = document.getElementById('theme-toggle');
+  if (localStorage.getItem('theme') === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
   
-  el.themeToggleBtn.addEventListener('click', () => {
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    if (isDark) {
+  toggle.addEventListener('click', () => {
+    const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    if (dark) {
       document.documentElement.removeAttribute('data-theme');
       localStorage.setItem('theme', 'light');
     } else {
@@ -400,34 +229,13 @@ function initTheme() {
   });
 }
 
-// --- UI HELPERS ---
-
-function showToast(message, type = 'success') {
-  el.toast.textContent = message;
-  
-  // Style according to type
-  if (type === 'danger') {
-    el.toast.style.borderLeftColor = 'var(--danger-color)';
-  } else {
-    el.toast.style.borderLeftColor = 'var(--primary-color)';
-  }
-  
-  el.toast.classList.remove('hidden');
-  
-  // Slide out after 3 seconds
-  setTimeout(() => {
-    el.toast.classList.add('hidden');
-  }, 3000);
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.remove('hidden');
+  setTimeout(() => toast.classList.add('hidden'), 2000);
 }
 
 function escapeHtml(str) {
-  if (!str) return '';
-  const map = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#039;'
-  };
-  return str.replace(/[&<>"']/g, function(m) { return map[m]; });
+  return str ? str.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m])) : '';
 }

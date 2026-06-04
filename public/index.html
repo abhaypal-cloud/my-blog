@@ -3,150 +3,107 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>my journal. — simple student notes</title>
+  <title>journal</title>
   
-  <!-- SEO Meta Tags -->
-  <meta name="description" content="A simple, distraction-free blog space sharing student notes, reflections, and coding guides.">
-  <meta name="author" content="Antigravity">
-  
-  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:ital,wght@0,500;0,600;1,400&display=swap" rel="stylesheet">
   
-  <!-- CSS Stylesheet -->
   <link rel="stylesheet" href="css/style.css">
-  
-  <!-- Feather Icons for clean vector UI icons -->
   <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
-  
-  <!-- Marked for markdown rendering -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
   
-  <!-- Header / Navigation -->
-  <header class="site-header">
-    <div class="header-container">
-      <a href="#home" class="logo" id="nav-logo">my journal<span>.</span></a>
-      <nav class="main-nav">
-        <a href="#new" class="btn btn-primary" id="btn-new-post">
-          <i data-feather="plus"></i> New Note
-        </a>
-        <button id="theme-toggle" class="theme-toggle-btn" aria-label="Toggle dark mode">
-          <i data-feather="moon" class="theme-icon-dark"></i>
-          <i data-feather="sun" class="theme-icon-light"></i>
+  <header class="header">
+    <div class="container header-wrap">
+      <a href="#home" class="logo">journal.</a>
+      <nav class="nav">
+        <a href="#new" class="new-btn"><i data-feather="plus"></i> New Note</a>
+        <button id="theme-toggle" class="theme-btn" aria-label="Toggle dark mode">
+          <i data-feather="moon" class="dark-icon"></i>
+          <i data-feather="sun" class="light-icon"></i>
         </button>
       </nav>
     </div>
   </header>
 
-  <!-- Notification Toast -->
   <div id="toast" class="toast hidden"></div>
 
-  <!-- Main Content Area -->
-  <main class="main-content">
-    <div class="content-container">
+  <main class="main">
+    <div class="container">
       
-      <!-- HOME VIEW -->
+      <!-- List View -->
       <section id="view-home" class="view hidden">
-        <div class="hero-section">
-          <h1>A simple notebook for study guides, class lectures, and student notes.</h1>
-          <p class="hero-subtitle">Keeping track of my academic journey and coding projects.</p>
+        <div class="hero">
+          <h1>Class notes, study guides, and thoughts.</h1>
         </div>
         
-        <div class="posts-filter">
-          <span class="filter-label">Filter:</span>
-          <div class="tags-container" id="home-tags-filter">
-            <!-- Dynamically populated tags -->
-          </div>
+        <div class="filter-bar">
+          <div class="tags" id="tags-filter"></div>
         </div>
 
-        <div class="posts-list" id="posts-list-container">
-          <!-- Dynamically populated blog list -->
-          <div class="loading-state">
-            <div class="spinner"></div>
-            <p>Gathering writings...</p>
-          </div>
+        <div id="posts-list" class="posts-feed">
+          <div class="loading">Loading notes...</div>
         </div>
       </section>
 
-      <!-- READ VIEW -->
+      <!-- Read View -->
       <section id="view-read" class="view hidden">
-        <div class="back-navigation">
-          <a href="#home" class="back-link"><i data-feather="arrow-left"></i> Back to notes</a>
-        </div>
+        <a href="#home" class="back-btn"><i data-feather="arrow-left"></i> Back to notes</a>
         
-        <article class="blog-post-article">
+        <article class="post">
           <header class="post-header">
+            <h1 id="read-title"></h1>
             <div class="post-meta">
-              <span id="read-post-date"></span>
-              <span class="meta-dot">•</span>
-              <span id="read-post-time"></span>
+              <span id="read-date"></span>
+              <span class="dot">•</span>
+              <span id="read-time"></span>
             </div>
-            <h1 id="read-post-title"></h1>
-            <div class="post-tags" id="read-post-tags">
-              <!-- Dynamically populated tags -->
-            </div>
+            <div id="read-tags" class="post-tags"></div>
           </header>
           
-          <div class="post-body-content markdown-body" id="read-post-body">
-            <!-- Dynamically rendered HTML from markdown -->
-          </div>
+          <div id="read-body" class="post-body"></div>
 
-          <footer class="post-actions-footer">
-            <button id="btn-edit-post" class="btn btn-secondary">
-              <i data-feather="edit-2"></i> Edit
-            </button>
-            <button id="btn-delete-post" class="btn btn-danger">
-              <i data-feather="trash-2"></i> Delete
-            </button>
-          </footer>
+          <div class="post-actions">
+            <button id="btn-edit" class="action-btn"><i data-feather="edit-2"></i> Edit</button>
+            <button id="btn-delete" class="action-btn delete"><i data-feather="trash-2"></i> Delete</button>
+          </div>
         </article>
       </section>
 
-      <!-- EDITOR VIEW (CREATE/EDIT) -->
+      <!-- Editor View -->
       <section id="view-editor" class="view hidden">
-        <div class="editor-header">
-          <h2 id="editor-view-title">New Note</h2>
-          <p class="editor-subtitle">Compose your thoughts and class notes. Markdown is supported.</p>
-        </div>
+        <h2 id="editor-title">New Note</h2>
 
-        <form id="editor-form" class="editor-form">
-          <input type="hidden" id="edit-post-id">
+        <form id="editor-form">
+          <input type="hidden" id="edit-id">
           
-          <div class="form-group">
+          <div class="input-group">
             <label for="post-title">Title</label>
-            <input type="text" id="post-title" name="title" placeholder="Give your note a title..." required autocomplete="off">
+            <input type="text" id="post-title" required placeholder="Note title...">
           </div>
 
-          <div class="form-group">
-            <label for="post-excerpt">Short Excerpt (Optional)</label>
-            <input type="text" id="post-excerpt" name="excerpt" placeholder="A brief summary for the home screen..." autocomplete="off">
+          <div class="input-group">
+            <label for="post-tags">Tags</label>
+            <input type="text" id="post-tags" placeholder="e.g. CS101, Study, Exam (comma separated)">
           </div>
 
-          <div class="form-group">
-            <label for="post-tags-input">Tags</label>
-            <input type="text" id="post-tags-input" name="tags" placeholder="e.g. CS101, Study, Reflection (comma separated)" autocomplete="off">
-          </div>
-
-          <div class="form-group">
-            <div class="editor-tabs">
-              <button type="button" class="tab-btn active" id="btn-tab-write">Write</button>
-              <button type="button" class="tab-btn" id="btn-tab-preview">Preview</button>
+          <div class="input-group">
+            <div class="tabs">
+              <button type="button" class="tab-btn active" id="tab-write">Write</button>
+              <button type="button" class="tab-btn" id="tab-preview">Preview</button>
             </div>
             
-            <div class="editor-workspace">
-              <textarea id="post-content" name="content" placeholder="Start writing here. Use Markdown for styling..." required></textarea>
-              <div id="editor-preview" class="markdown-body hidden">
-                <p class="preview-placeholder">Nothing to preview yet.</p>
-              </div>
+            <div class="editor-area">
+              <textarea id="post-content" required placeholder="Start writing here... (Markdown supported)"></textarea>
+              <div id="editor-preview" class="post-body hidden"></div>
             </div>
           </div>
 
-          <div class="editor-actions">
-            <button type="submit" class="btn btn-primary" id="btn-save-post">Save Note</button>
-            <a href="#home" class="btn btn-text">Cancel</a>
+          <div class="form-actions">
+            <button type="submit" class="submit-btn" id="btn-save">Save Note</button>
+            <a href="#home" class="cancel-btn">Cancel</a>
           </div>
         </form>
       </section>
@@ -154,15 +111,12 @@
     </div>
   </main>
 
-  <!-- Site Footer -->
-  <footer class="site-footer">
-    <div class="footer-container">
-      <p>&copy; 2026 my journal. All rights reserved.</p>
-      <p class="footer-tagline">A minimal study journal for student notes.</p>
+  <footer class="footer">
+    <div class="container">
+      <p>&copy; 2026 my journal. Minimal and simple.</p>
     </div>
   </footer>
 
-  <!-- Frontend Javascript App -->
   <script src="js/app.js"></script>
 </body>
 </html>
