@@ -1,9 +1,7 @@
 // --- THE JOURNAL FRONTEND APPLICATION LOGIC ---
 
 // Configuration
-const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-  ? '/api'
-  : 'https://YOUR-RENDER-BACKEND-URL.onrender.com/api';
+const API_URL = '/api';
 
 // State Management
 let state = {
