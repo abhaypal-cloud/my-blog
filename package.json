@@ -1,0 +1,20 @@
+{
+  "name": "minimal-blog-project",
+  "version": "1.0.0",
+  "description": "A very minimal and clean blog site with a simple Node.js backend",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "blog",
+    "minimal",
+    "express"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2"
+  }
+}
